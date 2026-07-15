@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+
+# Env / secrets
+.env
+.env.local
+
+# Prisma generated client (regenerated via `npm run postinstall` / `prisma generate`)
+backend/generated/
+
+# SQLite dev database
+backend/dev.db
+backend/dev.db-journal
+
+# Runtime data — uploaded and signed documents, not source
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/signed/*
+!backend/signed/.gitkeep
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db

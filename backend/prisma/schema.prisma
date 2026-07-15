@@ -1,0 +1,123 @@
+// Digital Signature App — data model
+// Dev: SQLite (zero-config, file-based). Prod: swap provider to "postgresql"
+// and point DATABASE_URL at a real Postgres instance — no model changes needed.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// The sender / account owner who prepares and sends documents.
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime   @default(now())
+  documents    Document[]
+}
+
+enum DocumentStatus {
+  DRAFT             // being prepared, fields not finalized
+  PENDING           // sent, waiting on one or more recipients
+  PARTIALLY_SIGNED  // some but not all recipients have signed
+  SIGNED            // every recipient has signed — PDF flattened + locked
+  DECLINED          // a recipient refused to sign
+}
+
+model Document {
+  id             String           @id @default(uuid())
+  ownerId        String
+  owner          User             @relation(fields: [ownerId], references: [id])
+  originalName   String
+  filePath       String           // original uploaded PDF, on disk / object storage
+  signedFilePath String?          // final flattened + locked PDF, once fully signed
+  status         DocumentStatus   @default(DRAFT)
+  createdAt      DateTime         @default(now())
+  sentAt         DateTime?
+  completedAt    DateTime?
+
+  recipients     Recipient[]
+  fields         SignatureField[]
+  auditEvents    AuditEvent[]
+
+  @@index([ownerId])
+}
+
+enum RecipientStatus {
+  PENDING
+  VIEWED
+  SIGNED
+  DECLINED
+}
+
+// One row per person who needs to sign — a document can have many.
+model Recipient {
+  id           String           @id @default(uuid())
+  documentId   String
+  document     Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  name         String
+  email        String?
+  phone        String?
+  signingToken String           @unique   // unique unguessable link: /sign/:signingToken
+  routingOrder Int              @default(0) // 0 = everyone signs in parallel; >0 = sequential
+  color        String           @default("#2563eb") // UI color-coding across sender + signer views
+  status       RecipientStatus  @default(PENDING)
+  viewedAt     DateTime?
+  signedAt     DateTime?
+
+  fields       SignatureField[]
+  auditEvents  AuditEvent[]
+
+  @@index([documentId])
+}
+
+enum FieldType {
+  SIGNATURE
+  INITIALS
+  DATE
+  TEXT
+}
+
+// A single placeholder/zone on the document, assigned to exactly one recipient.
+model SignatureField {
+  id          String     @id @default(uuid())
+  documentId  String
+  document    Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   Recipient  @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        FieldType  @default(SIGNATURE)
+  page        Int                 // 1-indexed PDF page
+  xPct        Float               // 0-1, relative to page width, top-left origin
+  yPct        Float               // 0-1, relative to page height, top-left origin
+  widthPct    Float
+  heightPct   Float
+  label       String?
+  required    Boolean    @default(true)
+  valueImage  String?             // base64 PNG signature/initials once completed
+  valueText   String?             // for TEXT/DATE field types
+  signedAt    DateTime?
+
+  @@index([documentId])
+  @@index([recipientId])
+}
+
+// Legal evidentiary trail: who did what, from where, when.
+model AuditEvent {
+  id          String     @id @default(uuid())
+  documentId  String
+  document    Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipientId String?
+  recipient   Recipient? @relation(fields: [recipientId], references: [id])
+  event       String     // "sent" | "viewed" | "signed" | "declined"
+  ipAddress   String
+  userAgent   String
+  createdAt   DateTime   @default(now())
+  metadata    String?    // JSON-encoded extra detail (e.g. field ids signed)
+
+  @@index([documentId])
+}
