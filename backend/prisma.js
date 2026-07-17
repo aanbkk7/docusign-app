@@ -1,12 +1,19 @@
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('./generated/prisma');
 
 // Driver-adapter setup (required by Prisma 7's "client" engine — no more
 // bundled query-engine binary talking directly to a connection string).
-// Swap the adapter package + url below to move to Postgres in production,
-// e.g. `@prisma/adapter-pg` with `DATABASE_URL=postgresql://...` — the
-// schema.prisma models and every route in this app stay unchanged.
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL || 'file:./dev.db' });
+// Works unchanged against any standard Postgres — a local install, Docker,
+// or a managed free-tier provider like Neon/Supabase — just point
+// DATABASE_URL at it.
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is not set. Add it to backend/.env — e.g. a free Postgres ' +
+    'connection string from https://neon.tech.'
+  );
+}
+
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 
 const prisma = new PrismaClient({ adapter });
 

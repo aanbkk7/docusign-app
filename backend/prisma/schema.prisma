@@ -1,6 +1,7 @@
 // Digital Signature App — data model
-// Dev: SQLite (zero-config, file-based). Prod: swap provider to "postgresql"
-// and point DATABASE_URL at a real Postgres instance — no model changes needed.
+// Postgres in both dev and prod (e.g. a free Neon database) — same
+// connection string shape works locally and on the hosting provider, so
+// there's only one schema/migration history to maintain.
 
 generator client {
   provider = "prisma-client-js"
@@ -8,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // The sender / account owner who prepares and sends documents.

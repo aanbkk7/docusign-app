@@ -284,6 +284,18 @@ body {
   display: flex; align-items: center; justify-content: center;
   line-height: 1;
 }
+.field-zone .resize-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 2px solid;
+  border-radius: 50%;
+  cursor: nwse-resize;
+  touch-action: none;
+}
 
 .drag-ghost {
   position: fixed;

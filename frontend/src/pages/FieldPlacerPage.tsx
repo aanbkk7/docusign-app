@@ -40,6 +40,7 @@ export default function FieldPlacerPage() {
   const [dragType, setDragType] = useState<FieldType | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [movingFieldId, setMovingFieldId] = useState<string | null>(null);
+  const [resizingFieldId, setResizingFieldId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -140,6 +141,38 @@ export default function FieldPlacerPage() {
     window.addEventListener('pointerup', onUp);
   }
 
+  // --- Resizing an already-placed field (bottom-right corner handle) ----
+
+  function handleResizePointerDown(field: SignatureField, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation(); // don't also trigger the field's own drag-to-move handler
+    const pageEl = (e.currentTarget as HTMLElement).closest('[data-page]') as HTMLElement | null;
+    if (!pageEl) return;
+    const rect = pageEl.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = field.widthPct;
+    const startH = field.heightPct;
+    setResizingFieldId(field.id);
+
+    const onMove = (ev: PointerEvent) => {
+      const dxPct = (ev.clientX - startX) / rect.width;
+      const dyPct = (ev.clientY - startY) / rect.height;
+      setFields(prev => prev.map(f => f.id !== field.id ? f : {
+        ...f,
+        widthPct: Math.max(0.04, Math.min(1 - f.xPct, startW + dxPct)),
+        heightPct: Math.max(0.025, Math.min(1 - f.yPct, startH + dyPct)),
+      }));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      setResizingFieldId(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
   function removeField(fieldId: string) {
     setFields(prev => prev.filter(f => f.id !== fieldId));
   }
@@ -193,7 +226,13 @@ export default function FieldPlacerPage() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+        {/* alignItems is intentionally left at the default (stretch), not
+            'flex-start' — the sidebar column must be as tall as the (much
+            taller) pages column for its sticky palette to have room to
+            stick while scrolling. With flex-start the sidebar shrinks to
+            its own content height and the sticky element stops following
+            the page past that point. */}
+        <div style={{ display: 'flex', gap: 24 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {Array.from({ length: numPages }, (_, i) => i + 1).map(page => (
               <div key={page} style={{ marginBottom: 24 }}>
@@ -221,7 +260,7 @@ export default function FieldPlacerPage() {
                           borderColor: owner?.color || '#999',
                           background: `${owner?.color || '#999'}1f`,
                           color: owner?.color || '#999',
-                          opacity: movingFieldId === field.id ? 0.6 : 1,
+                          opacity: movingFieldId === field.id || resizingFieldId === field.id ? 0.6 : 1,
                           cursor: 'grab',
                           touchAction: 'none',
                         }}
@@ -229,6 +268,12 @@ export default function FieldPlacerPage() {
                       >
                         {meta.icon} {owner?.name}
                         <button className="delete-btn" onPointerDown={e => e.stopPropagation()} onClick={() => removeField(field.id)}>×</button>
+                        <div
+                          className="resize-handle"
+                          style={{ borderColor: owner?.color || '#999' }}
+                          onPointerDown={e => handleResizePointerDown(field, e)}
+                          title="גרור כדי לשנות גודל"
+                        />
                       </div>
                     );
                   })}

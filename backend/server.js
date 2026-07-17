@@ -43,6 +43,19 @@ app.get('/api/local-ip', (req, res) => {
   res.json({ ip: LOCAL_IP, frontendUrl: `http://${LOCAL_IP}:5173` });
 });
 
+// In production there's no separate Vite dev server — this same process
+// serves the built React app too, so one deployed service (e.g. one Render
+// web service) is enough and there's no cross-origin API to configure.
+// Locally, frontend/dist won't exist (you run `vite` separately on :5173),
+// so this block is simply skipped.
+const frontendDist = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
+
 // Final safety net: every route above is wrapped in asyncHandler, so any
 // thrown/rejected error lands here instead of crashing the process.
 app.use((err, req, res, next) => {

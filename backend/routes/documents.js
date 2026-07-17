@@ -176,7 +176,12 @@ router.post('/:id/send', asyncHandler(async (req, res) => {
   if (doc.recipients.length === 0) return res.status(400).json({ error: 'Add at least one recipient first' });
   if (doc.fields.length === 0) return res.status(400).json({ error: 'Place at least one signature field first' });
 
-  const frontendUrl = req.body.frontendUrl || 'http://localhost:5173';
+  // In production PUBLIC_APP_URL is the one true origin for signing links —
+  // it always wins, so a request can't redirect recipients to an arbitrary
+  // domain by passing a spoofed frontendUrl. Locally, where there's no fixed
+  // public URL yet, we still honor the client's choice (LAN IP or an ngrok
+  // tunnel — see SendPage) so the existing dev workflow keeps working.
+  const frontendUrl = process.env.PUBLIC_APP_URL || req.body.frontendUrl || 'http://localhost:5173';
 
   const results = [];
   for (const recipient of doc.recipients) {
