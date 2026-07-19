@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 
 interface Props {
   onSave: (dataUrl: string) => void;
@@ -18,6 +19,8 @@ export default function SignatureModal({ onSave, onCancel, title = 'חתום כ�
   const drawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const [isEmpty, setIsEmpty] = useState(true);
+
+  useLockBodyScroll();
 
   useEffect(() => {
     const canvas = canvasRef.current!;

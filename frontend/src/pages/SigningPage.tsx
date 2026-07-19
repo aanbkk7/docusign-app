@@ -106,7 +106,10 @@ export default function SigningPage() {
   return (
     <div className="page">
       <div className="container">
-        <div style={{ background: 'white', borderRadius: 'var(--radius)', padding: '16px 24px', marginBottom: 24, boxShadow: 'var(--shadow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        {/* Sticky so the submit button stays reachable while scrolling through
+            a long, multi-page document — signers shouldn't have to scroll
+            all the way back to the top to send once every field is done. */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'white', borderRadius: 'var(--radius)', padding: '16px 24px', marginBottom: 24, boxShadow: 'var(--shadow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>
               <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: doc.recipient.color, marginInlineEnd: 6 }} />

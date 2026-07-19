@@ -40,6 +40,14 @@ export default function SendPage() {
     }
   }
 
+  function recipientStatusLabel(status: string) {
+    if (status === 'PENDING') return 'טרם נפתח';
+    if (status === 'VIEWED') return 'נפתח';
+    if (status === 'SIGNED') return 'חתם';
+    if (status === 'DECLINED') return 'סירב';
+    return status;
+  }
+
   function copyUrl(url: string, recipientId: string) {
     navigator.clipboard.writeText(url);
     setCopiedId(recipientId);
@@ -76,6 +84,25 @@ export default function SendPage() {
           </div>
         </div>
 
+        {doc.status === 'SIGNED' && doc.signedFilePath && (
+          <div className="card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--green)' }}>✅ המסמך נחתם על ידי כל החותמים</div>
+                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>הקובץ ננעל מפני עריכה נוספת</div>
+              </div>
+              <a
+                className="btn btn-success"
+                style={{ textDecoration: 'none' }}
+                href={`/signed/${doc.signedFilePath}`}
+                download
+              >
+                ⬇️ הורד מסמך חתום
+              </a>
+            </div>
+          </div>
+        )}
+
         <div className="card" style={{ marginBottom: 16 }}>
           <h3 style={{ fontSize: 14, marginBottom: 10 }}>חותמים</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -86,6 +113,11 @@ export default function SendPage() {
                 <span style={{ color: 'var(--gray-400)', fontSize: 12 }}>
                   {r.email || r.phone || 'ללא פרטי קשר'}
                 </span>
+                {r.status && (
+                  <span className={`badge badge-${r.status.toLowerCase()}`} style={{ marginInlineStart: 'auto' }}>
+                    {recipientStatusLabel(r.status)}
+                  </span>
+                )}
               </div>
             ))}
           </div>

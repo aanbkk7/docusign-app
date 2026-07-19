@@ -39,6 +39,7 @@ router.get('/', asyncHandler(async (req, res) => {
     createdAt: d.createdAt,
     recipientCount: d._count.recipients,
     fieldCount: d._count.fields,
+    signedFilePath: d.signedFilePath,
   })));
 }));
 

@@ -52,6 +52,7 @@ export interface Document {
   fields: SignatureField[];
   recipientCount?: number;
   fieldCount?: number;
+  signedFilePath?: string | null;
 }
 
 export interface SigningDoc {

@@ -126,6 +126,16 @@ export default function HomePage() {
                         פרטים
                       </button>
                     )}
+                    {doc.status === 'SIGNED' && doc.signedFilePath && (
+                      <a
+                        className="btn btn-success btn-sm"
+                        style={{ textDecoration: 'none' }}
+                        href={`/signed/${doc.signedFilePath}`}
+                        download
+                      >
+                        ⬇️ הורד
+                      </a>
+                    )}
                     <button
                       className="btn btn-outline btn-sm"
                       style={{ color: 'var(--red)' }}

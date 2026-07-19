@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 
 interface Props {
   onSave: (value: string) => void;
@@ -7,6 +8,7 @@ interface Props {
 
 export default function TextFieldModal({ onSave, onCancel }: Props) {
   const [value, setValue] = useState('');
+  useLockBodyScroll();
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>

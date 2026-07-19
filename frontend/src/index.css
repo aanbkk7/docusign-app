@@ -96,6 +96,7 @@ body {
 }
 .badge-draft { background: var(--gray-100); color: var(--gray-600); }
 .badge-pending { background: var(--yellow-light); color: var(--yellow); }
+.badge-viewed { background: var(--blue-light); color: var(--blue); }
 .badge-partially_signed { background: var(--blue-light); color: var(--blue); }
 .badge-signed { background: var(--green-light); color: var(--green); }
 .badge-declined { background: var(--red-light); color: var(--red); }
@@ -338,6 +339,15 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  /* Fallback height for browsers without dvh support; dvh (dynamic
+     viewport height) below tracks the *actual* visible area on mobile,
+     which changes as the browser's address bar collapses/expands —
+     without it a fixed, viewport-height backdrop can be sized against a
+     stale/larger viewport than what's really on screen. Combined with
+     useLockBodyScroll (which stops the page itself from scrolling while
+     a modal is open), this keeps the modal reliably centered on phones. */
+  height: 100vh;
+  height: 100dvh;
   background: rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
@@ -351,6 +361,8 @@ body {
   padding: 24px;
   max-width: 500px;
   width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }
 .modal h3 { margin-bottom: 16px; font-size: 18px; }
