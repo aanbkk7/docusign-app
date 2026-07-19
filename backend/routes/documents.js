@@ -10,8 +10,17 @@ const { sendSigningRequest } = require('../services/emailService');
 const { sendSigningRequestSms } = require('../services/smsService');
 const auditService = require('../services/auditService');
 const asyncHandler = require('../utils/asyncHandler');
+const { requireSenderAuth } = require('../middleware/requireSenderAuth');
 
 const router = express.Router();
+
+// Every route below is the sender's dashboard: list, upload, prepare, send,
+// delete, and download documents. A recipient's only door into the app is
+// their own unguessable /sign/:token link (routes/signing.js) — this
+// middleware makes sure nothing here is reachable without the shared
+// sender password, so a signer can never wander into (or guess their way
+// into) the full document list or another signer's finished PDF.
+router.use(requireSenderAuth);
 
 const upload = multer({
   dest: path.join(__dirname, '../uploads/'),
@@ -91,6 +100,22 @@ router.get('/:id', asyncHandler(async (req, res) => {
 router.get('/:id/audit', asyncHandler(async (req, res) => {
   const trail = await auditService.getTrail(req.params.id);
   res.json(trail);
+}));
+
+// GET /api/documents/:id/download — the final signed+locked PDF.
+// This is the *only* way to fetch a signed file: there is no unauthenticated
+// static route for /signed anymore, specifically so a recipient can never
+// end up with a link to (or need to guess) another signer's finished
+// document — this endpoint sits behind requireSenderAuth like everything
+// else in this router.
+router.get('/:id/download', asyncHandler(async (req, res) => {
+  const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+  if (doc.status !== 'SIGNED' || !doc.signedFilePath) {
+    return res.status(400).json({ error: 'Document is not fully signed yet' });
+  }
+  const filePath = path.join(__dirname, '../signed', doc.signedFilePath);
+  res.download(filePath, doc.originalName.replace(/\.pdf$/i, '') + ' (signed).pdf');
 }));
 
 // PUT /api/documents/:id/recipients — replace the recipient list

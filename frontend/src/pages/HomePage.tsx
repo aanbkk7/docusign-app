@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { uploadFile, listDocuments, deleteDocument } from '../api';
+import { uploadFile, listDocuments, deleteDocument, downloadSignedPdf, logout } from '../api';
 import { Document } from '../types';
 
 export default function HomePage() {
@@ -8,8 +8,26 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
+
+  async function handleDownload(doc: Document) {
+    setDownloadingId(doc.id);
+    setError('');
+    try {
+      await downloadSignedPdf(doc.id, doc.originalName);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   useEffect(() => { loadDocs(); }, []);
 
@@ -60,9 +78,12 @@ export default function HomePage() {
   return (
     <div className="page">
       <div className="container">
-        <div className="header">
-          <span style={{ fontSize: 32 }}>✍️</span>
-          <h1>חתימה דיגיטלית</h1>
+        <div className="header" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 32 }}>✍️</span>
+            <h1>חתימה דיגיטלית</h1>
+          </div>
+          <button className="btn btn-outline btn-sm" onClick={handleLogout}>יציאה 🔒</button>
         </div>
 
         {/* Upload zone */}
@@ -127,14 +148,13 @@ export default function HomePage() {
                       </button>
                     )}
                     {doc.status === 'SIGNED' && doc.signedFilePath && (
-                      <a
+                      <button
                         className="btn btn-success btn-sm"
-                        style={{ textDecoration: 'none' }}
-                        href={`/signed/${doc.signedFilePath}`}
-                        download
+                        onClick={() => handleDownload(doc)}
+                        disabled={downloadingId === doc.id}
                       >
-                        ⬇️ הורד
-                      </a>
+                        {downloadingId === doc.id ? '...' : '⬇️ הורד'}
+                      </button>
                     )}
                     <button
                       className="btn btn-outline btn-sm"

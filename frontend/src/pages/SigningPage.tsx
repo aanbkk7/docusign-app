@@ -57,11 +57,9 @@ export default function SigningPage() {
     setError('');
     try {
       const res = await submitSignatures(token, values);
-      if (res.allSigned && res.downloadUrl) {
-        navigate('/success', { state: { downloadUrl: res.downloadUrl, originalName: res.originalName } });
-      } else {
-        setTerminalState('signed');
-      }
+      // No download link here on purpose — a recipient's access ends at
+      // signing. Only the sender can retrieve the finished PDF.
+      navigate('/success', { state: { allSigned: res.allSigned, originalName: res.originalName } });
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -191,6 +189,26 @@ export default function SigningPage() {
           </div>
         ))}
       </div>
+
+      {/* Fixed (not just sticky) floating submit button — a second,
+          bulletproof guarantee that "send" is reachable from anywhere on a
+          long document without scrolling, independent of whether the
+          sticky header behaves as expected on a given mobile browser. */}
+      <button
+        className={`btn btn-lg ${allSigned ? 'btn-success' : 'btn-outline'}`}
+        style={{
+          position: 'fixed',
+          bottom: 20,
+          insetInlineEnd: 20,
+          zIndex: 200,
+          boxShadow: 'var(--shadow-lg)',
+          background: allSigned ? undefined : 'white',
+        }}
+        onClick={handleSubmit}
+        disabled={!allSigned || submitting}
+      >
+        {submitting ? 'שולח...' : allSigned ? '✅ שלח' : `${myFields.length - Object.keys(values).length} שדות נותרו`}
+      </button>
 
       {activeField && (activeField.type === 'SIGNATURE' || activeField.type === 'INITIALS') && (
         <SignatureModal

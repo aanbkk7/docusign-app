@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getDocument, sendDocument } from '../api';
+import { getDocument, sendDocument, downloadSignedPdf } from '../api';
 import { Document, SendResult } from '../types';
 
 export default function SendPage() {
@@ -14,6 +14,20 @@ export default function SendPage() {
   const [results, setResults] = useState<SendResult[] | null>(null);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!doc) return;
+    setDownloading(true);
+    setError('');
+    try {
+      await downloadSignedPdf(doc.id, doc.originalName);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -84,6 +98,8 @@ export default function SendPage() {
           </div>
         </div>
 
+        {error && <div className="alert alert-error">{error}</div>}
+
         {doc.status === 'SIGNED' && doc.signedFilePath && (
           <div className="card" style={{ marginBottom: 16, borderColor: 'var(--green)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -91,14 +107,9 @@ export default function SendPage() {
                 <div style={{ fontWeight: 700, color: 'var(--green)' }}>✅ המסמך נחתם על ידי כל החותמים</div>
                 <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 2 }}>הקובץ ננעל מפני עריכה נוספת</div>
               </div>
-              <a
-                className="btn btn-success"
-                style={{ textDecoration: 'none' }}
-                href={`/signed/${doc.signedFilePath}`}
-                download
-              >
-                ⬇️ הורד מסמך חתום
-              </a>
+              <button className="btn btn-success" onClick={handleDownload} disabled={downloading}>
+                {downloading ? 'מוריד...' : '⬇️ הורד מסמך חתום'}
+              </button>
             </div>
           </div>
         )}
@@ -125,7 +136,6 @@ export default function SendPage() {
 
         {!results ? (
           <div className="card">
-            {error && <div className="alert alert-error">{error}</div>}
 
             <div style={{ borderBottom: '1px solid var(--gray-200)', paddingBottom: 16, marginBottom: 16 }}>
               <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--gray-600)' }}>

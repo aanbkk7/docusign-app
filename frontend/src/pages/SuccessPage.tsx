@@ -1,9 +1,8 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 export default function SuccessPage() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { downloadUrl, originalName } = (location.state || {}) as { downloadUrl?: string; originalName?: string };
+  const { allSigned, originalName } = (location.state || {}) as { allSigned?: boolean; originalName?: string };
 
   return (
     <div className="page text-center">
@@ -12,26 +11,14 @@ export default function SuccessPage() {
         <h1 style={{ fontSize: 28, marginBottom: 12, color: 'var(--green)' }}>
           החתימה הושלמה!
         </h1>
-        <p style={{ color: 'var(--gray-600)', fontSize: 16, marginBottom: 32 }}>
-          {originalName ? `"${originalName}" נחתם בהצלחה.` : 'המסמך נחתם בהצלחה.'}
+        <p style={{ color: 'var(--gray-600)', fontSize: 16 }}>
+          {originalName ? `חתמת בהצלחה על "${originalName}".` : 'חתמת בהצלחה על המסמך.'}
         </p>
-
-        {downloadUrl && (
-          <a
-            href={downloadUrl}
-            download
-            className="btn btn-success btn-lg"
-            style={{ display: 'inline-flex', marginBottom: 16 }}
-          >
-            ⬇️ הורד מסמך חתום
-          </a>
-        )}
-
-        <div>
-          <button className="btn btn-outline" onClick={() => navigate('/')}>
-            חזור לדף הבית
-          </button>
-        </div>
+        <p style={{ color: 'var(--gray-400)', fontSize: 14, marginTop: 8 }}>
+          {allSigned
+            ? 'כל החותמים סיימו — המסמך ננעל ונשלח לבעל המסמך.'
+            : 'נחכה שכל שאר החותמים יסיימו כדי לנעול את המסמך הסופי.'}
+        </p>
       </div>
     </div>
   );

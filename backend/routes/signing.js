@@ -136,10 +136,12 @@ router.post('/:token', asyncHandler(async (req, res) => {
     data: { status: 'SIGNED', signedFilePath: signedFileName, completedAt: new Date() },
   });
 
+  // Deliberately no download link in this response — a recipient's access
+  // ends at signing. Only the sender can retrieve the finished PDF, via the
+  // authenticated GET /api/documents/:id/download.
   res.json({
     ok: true,
     allSigned: true,
-    downloadUrl: `/signed/${signedFileName}`,
     originalName: doc.originalName,
   });
 }));

@@ -32,9 +32,15 @@ app.set('trust proxy', true);
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
+// Original (unsigned) PDFs stay unauthenticated — a recipient's signing
+// page needs to fetch/render one without ever having a sender password.
+// The *signed* PDFs are intentionally NOT statically served: they're only
+// reachable through GET /api/documents/:id/download, which sits behind
+// requireSenderAuth (see routes/documents.js) — recipients can sign and
+// submit, nothing else.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/signed', express.static(path.join(__dirname, 'signed')));
 
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/sign', require('./routes/signing'));
 
