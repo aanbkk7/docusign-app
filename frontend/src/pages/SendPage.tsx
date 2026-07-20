@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDocument, sendDocument, downloadSignedPdf } from '../api';
-import { Document, SendResult } from '../types';
+import { Document, FIELD_TYPE_META, SendResult } from '../types';
+import PdfPageViewer from '../components/PdfPageViewer';
 
 export default function SendPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,8 @@ export default function SendPage() {
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
+  const [numPages, setNumPages] = useState(0);
 
   async function handleDownload() {
     if (!doc) return;
@@ -31,7 +34,14 @@ export default function SendPage() {
 
   useEffect(() => {
     if (!id) return;
-    getDocument(id).then(setDoc);
+    getDocument(id).then(d => {
+      setDoc(d);
+      import('pdfjs-dist').then(async pdfjsLib => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
+        const pdf = await pdfjsLib.getDocument(`/uploads/${d.filePath}`).promise;
+        setNumPages(pdf.numPages);
+      });
+    });
     fetch('/api/local-ip')
       .then(r => r.json())
       .then(d => setNetworkUrl(d.frontendUrl))
@@ -133,6 +143,74 @@ export default function SendPage() {
             ))}
           </div>
         </div>
+
+        {doc.status !== 'DRAFT' && doc.fields.length > 0 && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <h3 style={{ fontSize: 14 }}>מעקב חתימות</h3>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowPreview(v => !v)}>
+                {showPreview ? 'הסתר מסמך' : '📄 הצג מסמך'}
+              </button>
+            </div>
+
+            {(() => {
+              const signedCount = doc.fields.filter(f => f.valueImage || f.valueText).length;
+              const pct = Math.round((signedCount / doc.fields.length) * 100);
+              return (
+                <>
+                  <div style={{ fontSize: 13, color: 'var(--gray-600)', marginBottom: 6 }}>
+                    {signedCount} מתוך {doc.fields.length} שדות נחתמו בפועל
+                  </div>
+                  <div style={{ height: 8, borderRadius: 100, background: 'var(--gray-100)', overflow: 'hidden', marginBottom: showPreview ? 20 : 0 }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--green)' : 'var(--blue)', transition: 'width 0.3s' }} />
+                  </div>
+                </>
+              );
+            })()}
+
+            {showPreview && (
+              <div>
+                {Array.from({ length: numPages }, (_, i) => i + 1).map(page => (
+                  <div key={page} style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 13, color: 'var(--gray-400)', marginBottom: 4 }}>עמוד {page} מתוך {numPages}</div>
+                    <div className="pdf-container">
+                      <PdfPageViewer fileUrl={`/uploads/${doc.filePath}`} pageNumber={page} scale={1.4} />
+                      {doc.fields.filter(f => f.page === page).map(field => {
+                        const owner = doc.recipients.find(r => r.id === field.recipientId);
+                        const meta = FIELD_TYPE_META[field.type];
+                        const signed = !!(field.valueImage || field.valueText);
+                        return (
+                          <div
+                            key={field.id}
+                            className="field-zone"
+                            style={{
+                              left: `${field.xPct * 100}%`,
+                              top: `${field.yPct * 100}%`,
+                              width: `${field.widthPct * 100}%`,
+                              height: `${field.heightPct * 100}%`,
+                              borderStyle: signed ? 'solid' : 'dashed',
+                              borderColor: owner?.color || '#999',
+                              background: signed ? `${owner?.color || '#999'}0f` : `${owner?.color || '#999'}1f`,
+                              color: owner?.color || '#999',
+                              opacity: signed ? 1 : 0.7,
+                            }}
+                          >
+                            {field.valueImage
+                              ? <img src={field.valueImage} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="" />
+                              : field.valueText
+                                ? <span style={{ fontSize: 12 }}>{field.valueText}</span>
+                                : <span>{meta.icon} {owner?.name} · ממתין</span>
+                            }
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {!results ? (
           <div className="card">
