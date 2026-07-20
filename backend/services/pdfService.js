@@ -1,6 +1,5 @@
 const { PDFDocument, StandardFonts, rgb } = require('@cantoo/pdf-lib');
 const crypto = require('crypto');
-const fs = require('fs');
 
 // Percentage coords (0-1, top-left origin) -> PDF points (bottom-left origin).
 function pctToPoint(field, pageWidth, pageHeight) {
@@ -111,10 +110,11 @@ function lockDocument(pdfDoc) {
 
 /**
  * Builds the final, signed, locked PDF for a document once every recipient
- * has completed their fields.
+ * has completed their fields. Takes the original PDF as bytes (fetched by
+ * the caller from wherever it's actually stored — R2, not local disk) so
+ * this module has no dependency on the filesystem at all.
  */
-async function finalizeDocument({ pdfPath, fields, recipients, auditEvents, documentName }) {
-  const pdfBytes = fs.readFileSync(pdfPath);
+async function finalizeDocument({ pdfBytes, fields, recipients, auditEvents, documentName }) {
   const pdfDoc = await PDFDocument.load(pdfBytes);
 
   await embedFieldValues(pdfDoc, fields);

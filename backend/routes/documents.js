@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const prisma = require('../prisma');
 const { getDefaultUser } = require('../services/userService');
@@ -11,6 +10,7 @@ const { sendSigningRequestSms } = require('../services/smsService');
 const auditService = require('../services/auditService');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireSenderAuth } = require('../middleware/requireSenderAuth');
+const storage = require('../services/storageService');
 
 const router = express.Router();
 
@@ -22,8 +22,12 @@ const router = express.Router();
 // into) the full document list or another signer's finished PDF.
 router.use(requireSenderAuth);
 
+// Files are held in memory just long enough to forward them to R2 — nothing
+// is ever written to local disk, which on Render's free tier is ephemeral
+// and gets wiped on every restart (that previously deleted a live,
+// in-progress document out from under its recipients).
 const upload = multer({
-  dest: path.join(__dirname, '../uploads/'),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter(req, file, cb) {
     const allowed = ['.pdf', '.doc', '.docx'];
@@ -61,21 +65,20 @@ router.post('/upload', upload.single('file'), asyncHandler(async (req, res) => {
 
   const ext = path.extname(originalName).toLowerCase();
   if (ext !== '.pdf') {
-    fs.unlinkSync(req.file.path);
     return res.status(400).json({
       error: 'Please convert your Word file to PDF first. You can do this in Word: File → Save As → PDF.',
     });
   }
 
-  const newPath = req.file.path + '.pdf';
-  fs.renameSync(req.file.path, newPath);
+  const filename = `${uuidv4()}.pdf`;
+  await storage.uploadObject(`uploads/${filename}`, req.file.buffer, 'application/pdf');
 
   const ownerId = await getDefaultUser();
   const doc = await prisma.document.create({
     data: {
       ownerId,
       originalName,
-      filePath: path.basename(newPath),
+      filePath: filename,
       status: 'DRAFT',
     },
   });
@@ -114,8 +117,11 @@ router.get('/:id/download', asyncHandler(async (req, res) => {
   if (doc.status !== 'SIGNED' || !doc.signedFilePath) {
     return res.status(400).json({ error: 'Document is not fully signed yet' });
   }
-  const filePath = path.join(__dirname, '../signed', doc.signedFilePath);
-  res.download(filePath, doc.originalName.replace(/\.pdf$/i, '') + ' (signed).pdf');
+  const buffer = await storage.getObject(`signed/${doc.signedFilePath}`);
+  const filename = doc.originalName.replace(/\.pdf$/i, '') + ' (signed).pdf';
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+  res.send(buffer);
 }));
 
 // PUT /api/documents/:id/recipients — replace the recipient list
@@ -259,9 +265,9 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
   if (!doc) return res.status(404).json({ error: 'Not found' });
 
-  try { fs.unlinkSync(path.join(__dirname, '../uploads', doc.filePath)); } catch {}
+  await storage.deleteObject(`uploads/${doc.filePath}`);
   if (doc.signedFilePath) {
-    try { fs.unlinkSync(path.join(__dirname, '../signed', doc.signedFilePath)); } catch {}
+    await storage.deleteObject(`signed/${doc.signedFilePath}`);
   }
 
   // Recipients, fields, and audit events cascade-delete via the schema

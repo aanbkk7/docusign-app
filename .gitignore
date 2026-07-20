@@ -15,11 +15,10 @@ backend/generated/
 backend/dev.db
 backend/dev.db-journal
 
-# Runtime data — uploaded and signed documents, not source
-backend/uploads/*
-!backend/uploads/.gitkeep
-backend/signed/*
-!backend/signed/.gitkeep
+# Uploaded/signed PDFs live in Cloudflare R2 (see storageService.js), not
+# on local disk — ignore anything a local test run drops here anyway.
+backend/uploads/
+backend/signed/
 
 # OS/editor cruft
 .DS_Store

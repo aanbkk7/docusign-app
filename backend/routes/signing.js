@@ -1,10 +1,9 @@
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const prisma = require('../prisma');
 const { finalizeDocument } = require('../services/pdfService');
 const auditService = require('../services/auditService');
 const asyncHandler = require('../utils/asyncHandler');
+const storage = require('../services/storageService');
 
 const router = express.Router();
 
@@ -119,9 +118,9 @@ router.post('/:token', asyncHandler(async (req, res) => {
   const allFields = await prisma.signatureField.findMany({ where: { documentId: doc.id } });
   const auditEvents = await auditService.getTrail(doc.id);
 
-  const pdfPath = path.join(__dirname, '../uploads', doc.filePath);
+  const pdfBytes = await storage.getObject(`uploads/${doc.filePath}`);
   const signedBytes = await finalizeDocument({
-    pdfPath,
+    pdfBytes,
     fields: allFields,
     recipients: allRecipients,
     auditEvents,
@@ -129,7 +128,7 @@ router.post('/:token', asyncHandler(async (req, res) => {
   });
 
   const signedFileName = `signed_${doc.filePath}`;
-  fs.writeFileSync(path.join(__dirname, '../signed', signedFileName), signedBytes);
+  await storage.uploadObject(`signed/${signedFileName}`, Buffer.from(signedBytes), 'application/pdf');
 
   await prisma.document.update({
     where: { id: doc.id },

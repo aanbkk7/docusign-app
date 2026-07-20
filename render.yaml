@@ -22,6 +22,14 @@ services:
         sync: false # the https://xxxx.onrender.com URL Render gives this service
       - key: SENDER_PASSWORD
         sync: false # required — gates the sender dashboard; recipients don't need it
+      - key: R2_ACCOUNT_ID
+        sync: false # required — Cloudflare R2 (uploaded/signed PDFs are stored here, not on local disk)
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
