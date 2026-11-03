@@ -29,6 +29,17 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
     if (res) {
       const snippet = (await res.clone().text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120);
       lastInfo = `קוד ${res.status}, ${contentType || 'ללא סוג'}: ${snippet}`;
+      // A *successful* (200) HTML page in answer to an /api call can't come
+      // from our server or from a waking host (those answer 5xx) — it's
+      // something between the browser and the server (an internet filter,
+      // firewall or captive portal) replying in its place. Retrying won't
+      // change that, so say so right away instead of waiting.
+      if (res.status === 200 && contentType.includes('text/html')) {
+        throw new Error(
+          'הבקשה נחסמה בדרך לשרת — כנראה על ידי סינון אינטרנט או חומת אש ברשת/במחשב שלך, ' +
+          'ולא על ידי האפליקציה. (נסה רשת אחרת, למשל נקודה חמה מהטלפון, או בקש מספק הסינון לאשר את האתר.)'
+        );
+      }
     }
     if (attempt >= maxAttempts) {
       throw new Error(`השרת לא הגיב כראוי (${lastInfo}). נסה שוב בעוד דקה.`);
