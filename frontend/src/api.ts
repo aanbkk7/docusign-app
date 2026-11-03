@@ -10,23 +10,30 @@ const AUTH_STORAGE_KEY = 'senderPassword';
 // returns HTML from /api, so an HTML/gateway response means the request
 // never reached it; it's safe to wait and retry (even for uploads).
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const maxAttempts = 8;
+  const maxAttempts = 5;
+  let lastInfo = 'אין חיבור לשרת';
   for (let attempt = 1; ; attempt++) {
     let res: Response | null = null;
     try {
       res = await fetch(input, init);
-    } catch {
+    } catch (e: any) {
       // network hiccup while the server is waking up — treat like a gateway miss
+      lastInfo = `שגיאת רשת: ${e?.message || 'לא ידועה'}`;
     }
+    const contentType = res?.headers.get('content-type') || '';
     const isGatewayMiss =
       !res ||
       [502, 503, 504].includes(res.status) ||
-      (res.headers.get('content-type') || '').includes('text/html');
+      contentType.includes('text/html');
     if (!isGatewayMiss) return res!;
-    if (attempt >= maxAttempts) {
-      throw new Error('השרת עדיין מתעורר או לא זמין. נסה שוב בעוד דקה.');
+    if (res) {
+      const snippet = (await res.clone().text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120);
+      lastInfo = `קוד ${res.status}, ${contentType || 'ללא סוג'}: ${snippet}`;
     }
-    await new Promise(r => setTimeout(r, 8000));
+    if (attempt >= maxAttempts) {
+      throw new Error(`השרת לא הגיב כראוי (${lastInfo}). נסה שוב בעוד דקה.`);
+    }
+    await new Promise(r => setTimeout(r, 6000));
   }
 }
 
