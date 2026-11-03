@@ -3,6 +3,33 @@ import { AuditEvent, Document, Recipient, SendResult, SignatureField, SigningDoc
 const BASE = '/api';
 const AUTH_STORAGE_KEY = 'senderPassword';
 
+// On the free hosting tier the server goes to sleep when idle, and while it
+// wakes up (up to ~1 minute) the hosting proxy answers with its own HTML
+// "starting up" page (or a 502/503/504) instead of our JSON — which used to
+// surface as 'Unexpected token "<" ... is not valid JSON'. Our app never
+// returns HTML from /api, so an HTML/gateway response means the request
+// never reached it; it's safe to wait and retry (even for uploads).
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const maxAttempts = 8;
+  for (let attempt = 1; ; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(input, init);
+    } catch {
+      // network hiccup while the server is waking up — treat like a gateway miss
+    }
+    const isGatewayMiss =
+      !res ||
+      [502, 503, 504].includes(res.status) ||
+      (res.headers.get('content-type') || '').includes('text/html');
+    if (!isGatewayMiss) return res!;
+    if (attempt >= maxAttempts) {
+      throw new Error('השרת עדיין מתעורר או לא זמין. נסה שוב בעוד דקה.');
+    }
+    await new Promise(r => setTimeout(r, 8000));
+  }
+}
+
 // --- Sender auth -----------------------------------------------------
 // One shared password gates every sender-facing route (list/upload/prepare/
 // send/delete/download). There's no session/expiry by design — "unlimited
@@ -24,7 +51,7 @@ export function logout(): void {
 }
 
 export async function login(password: string): Promise<void> {
-  const res = await fetch(`${BASE}/auth/login`, {
+  const res = await apiFetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password }),
@@ -64,22 +91,22 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 export async function uploadFile(file: File): Promise<{ id: string; originalName: string }> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BASE}/documents/upload`, { method: 'POST', headers: authHeaders(), body: form });
+  const res = await apiFetch(`${BASE}/documents/upload`, { method: 'POST', headers: authHeaders(), body: form });
   return asJson(res);
 }
 
 export async function listDocuments(): Promise<Document[]> {
-  const res = await fetch(`${BASE}/documents`, { headers: authHeaders() });
+  const res = await apiFetch(`${BASE}/documents`, { headers: authHeaders() });
   return asJson(res);
 }
 
 export async function getDocument(id: string): Promise<Document> {
-  const res = await fetch(`${BASE}/documents/${id}`, { headers: authHeaders() });
+  const res = await apiFetch(`${BASE}/documents/${id}`, { headers: authHeaders() });
   return asJson(res);
 }
 
 export async function saveRecipients(id: string, recipients: Recipient[]): Promise<Recipient[]> {
-  const res = await fetch(`${BASE}/documents/${id}/recipients`, {
+  const res = await apiFetch(`${BASE}/documents/${id}/recipients`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ recipients }),
@@ -88,7 +115,7 @@ export async function saveRecipients(id: string, recipients: Recipient[]): Promi
 }
 
 export async function saveFields(id: string, fields: SignatureField[]): Promise<void> {
-  const res = await fetch(`${BASE}/documents/${id}/fields`, {
+  const res = await apiFetch(`${BASE}/documents/${id}/fields`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ fields }),
@@ -97,7 +124,7 @@ export async function saveFields(id: string, fields: SignatureField[]): Promise<
 }
 
 export async function sendDocument(id: string, frontendUrl?: string): Promise<{ results: SendResult[] }> {
-  const res = await fetch(`${BASE}/documents/${id}/send`, {
+  const res = await apiFetch(`${BASE}/documents/${id}/send`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ frontendUrl }),
@@ -106,12 +133,12 @@ export async function sendDocument(id: string, frontendUrl?: string): Promise<{ 
 }
 
 export async function getAuditTrail(id: string): Promise<AuditEvent[]> {
-  const res = await fetch(`${BASE}/documents/${id}/audit`, { headers: authHeaders() });
+  const res = await apiFetch(`${BASE}/documents/${id}/audit`, { headers: authHeaders() });
   return asJson(res);
 }
 
 export async function deleteDocument(id: string): Promise<void> {
-  await fetch(`${BASE}/documents/${id}`, { method: 'DELETE', headers: authHeaders() });
+  await apiFetch(`${BASE}/documents/${id}`, { method: 'DELETE', headers: authHeaders() });
 }
 
 // Downloads go through fetch (not a plain <a href>) specifically so the
@@ -119,7 +146,7 @@ export async function deleteDocument(id: string): Promise<void> {
 // Authorization header, and there is no unauthenticated URL for a signed
 // PDF anymore.
 export async function downloadSignedPdf(id: string, suggestedName: string): Promise<void> {
-  const res = await fetch(`${BASE}/documents/${id}/download`, { headers: authHeaders() });
+  const res = await apiFetch(`${BASE}/documents/${id}/download`, { headers: authHeaders() });
   if (res.status === 401) {
     logout();
     window.location.href = '/login';
@@ -143,7 +170,7 @@ export async function downloadSignedPdf(id: string, suggestedName: string): Prom
 // --- Recipient-facing (unauthenticated, token-scoped) -----------------
 
 export async function getSigningDoc(token: string): Promise<SigningDoc> {
-  const res = await fetch(`${BASE}/sign/${token}`);
+  const res = await apiFetch(`${BASE}/sign/${token}`);
   return asJson(res);
 }
 
@@ -151,7 +178,7 @@ export async function submitSignatures(
   token: string,
   values: Record<string, string>
 ): Promise<{ allSigned: boolean; originalName: string }> {
-  const res = await fetch(`${BASE}/sign/${token}`, {
+  const res = await apiFetch(`${BASE}/sign/${token}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ values }),
@@ -160,7 +187,7 @@ export async function submitSignatures(
 }
 
 export async function declineSigning(token: string, reason?: string): Promise<void> {
-  const res = await fetch(`${BASE}/sign/${token}/decline`, {
+  const res = await apiFetch(`${BASE}/sign/${token}/decline`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reason }),
